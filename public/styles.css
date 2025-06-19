@@ -1,0 +1,46 @@
+body {
+  background-color: #35654d;
+  font-family: sans-serif;
+  color: white;
+  text-align: center;
+}
+
+#table {
+  margin: auto;
+  padding: 20px;
+}
+
+#players {
+  margin-bottom: 10px;
+}
+
+#hand {
+  margin-top: 20px;
+  display: grid;
+  grid-template-columns: repeat(2, 50px);
+  grid-gap: 5px;
+  justify-content: center;
+}
+
+.other-hand {
+  display: grid;
+  grid-template-columns: repeat(2, 50px);
+  grid-gap: 5px;
+  justify-content: center;
+  margin-bottom: 10px;
+}
+
+.card {
+  display: inline-block;
+  width: 50px;
+  height: 70px;
+  line-height: 70px;
+  border: 1px solid #fff;
+  margin: 0;
+  background: #1e2824;
+  text-align: center;
+}
+
+#messages {
+  margin-top: 20px;
+}
