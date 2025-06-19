@@ -10,7 +10,8 @@ app.use(express.static('public'));
 
 // Simple Cabo game state
 let game = {
-  players: {}, // socket.id -> {name, hand: [], revealed: [], drawn: null, pendingPower: null}
+  // socket.id -> {name, hand: [], drawn: null, pendingPower: null, peeks: 0}
+  players: {},
   order: [],
   deck: [],
   discard: [],
@@ -50,10 +51,12 @@ function cardValue(card) {
 
 function sendHand(id) {
   const p = game.players[id];
-  io.to(id).emit('hand', {
-    cards: p.hand.map(cardString),
-    revealed: p.revealed,
-  });
+  io.to(id).emit('hand', { size: p.hand.length });
+}
+
+function sendDiscard() {
+  const top = game.discard[game.discard.length - 1];
+  io.emit('discardTop', top ? cardString(top) : null);
 }
 
 function currentPlayer() {
@@ -101,27 +104,23 @@ function deal() {
   game.order.forEach(id => {
     const player = game.players[id];
     player.hand = [];
-    player.revealed = [false, false, false, false];
     player.drawn = null;
     player.pendingPower = null;
+    player.peeks = 2;
     for (let i = 0; i < 4; i++) {
       player.hand.push(game.deck.pop());
     }
-    const a = Math.floor(Math.random() * 4);
-    let b;
-    do { b = Math.floor(Math.random() * 4); } while (b === a);
-    player.revealed[a] = true;
-    player.revealed[b] = true;
     sendHand(id);
   });
   game.started = true;
   game.turnIndex = 0;
+  sendDiscard();
 }
 
 io.on('connection', (socket) => {
   socket.on('join', (name) => {
     if (Object.keys(game.players).length >= 6 || game.started) return;
-    game.players[socket.id] = { name, hand: [], revealed: [], drawn: null, pendingPower: null };
+    game.players[socket.id] = { name, hand: [], drawn: null, pendingPower: null, peeks: 0 };
     game.order.push(socket.id);
     io.emit('players', game.order.map(pid => ({ id: pid, name: game.players[pid].name })));
   });
@@ -131,6 +130,7 @@ io.on('connection', (socket) => {
     if (socket.id === game.order[0]) {
       deal();
       io.emit('start', game.order.map(id => ({ id, name: game.players[id].name })));
+      game.order.forEach(id => io.to(id).emit('peeks', game.players[id].peeks));
       io.to(game.order[game.turnIndex]).emit('yourTurn');
     }
   });
@@ -142,15 +142,26 @@ io.on('connection', (socket) => {
     socket.emit('drawn', cardString(player.drawn));
   });
 
+  socket.on('peek', index => {
+    const player = game.players[socket.id];
+    if (!game.started || player.peeks <= 0) return;
+    const card = player.hand[index];
+    if (card) {
+      player.peeks -= 1;
+      socket.emit('reveal', { index, card: cardString(card) });
+      socket.emit('peeks', player.peeks);
+    }
+  });
+
   socket.on('replace', (index) => {
     const player = game.players[socket.id];
     if (!game.started || currentPlayer() !== player) return;
     const old = player.hand[index];
     player.hand[index] = player.drawn;
-    player.revealed[index] = true;
     game.discard.push(old);
-    sendHand(socket.id);
     player.drawn = null;
+    sendHand(socket.id);
+    sendDiscard();
     handlePower(socket, old);
   });
 
@@ -161,6 +172,7 @@ io.on('connection', (socket) => {
     game.discard.push(card);
     player.drawn = null;
     sendHand(socket.id);
+    sendDiscard();
     handlePower(socket, card);
   });
 
@@ -168,14 +180,16 @@ io.on('connection', (socket) => {
     const player = game.players[socket.id];
     if (!player.pendingPower) return;
     switch (player.pendingPower.type) {
-      case 'peekSelf':
-        player.revealed[data.index] = true;
-        sendHand(socket.id);
+      case 'peekSelf': {
+        const c = player.hand[data.index];
+        if (c) socket.emit('reveal', { index: data.index, card: cardString(c) });
         break;
+      }
       case 'peekOther':
         const target = game.players[data.target];
         if (target) {
-          socket.emit('reveal', cardString(target.hand[data.index]));
+          const c = target.hand[data.index];
+          if (c) socket.emit('reveal', { player: data.target, index: data.index, card: cardString(c) });
         }
         break;
       case 'blindSwap':
@@ -184,8 +198,6 @@ io.on('connection', (socket) => {
           const tmp = player.hand[data.my];
           player.hand[data.my] = t.hand[data.their];
           t.hand[data.their] = tmp;
-          player.revealed[data.my] = false;
-          if (t.revealed) t.revealed[data.their] = false;
           sendHand(socket.id);
           sendHand(data.target);
         }
@@ -193,13 +205,12 @@ io.on('connection', (socket) => {
       case 'lookSwap':
         const tgt = game.players[data.target];
         if (tgt) {
-          player.revealed[data.my] = true;
           const temp = player.hand[data.my];
           player.hand[data.my] = tgt.hand[data.their];
           tgt.hand[data.their] = temp;
-          if (tgt.revealed) tgt.revealed[data.their] = false;
           sendHand(socket.id);
           sendHand(data.target);
+          socket.emit('reveal', { index: data.my, card: cardString(player.hand[data.my]) });
         }
         break;
     }
@@ -219,10 +230,9 @@ io.on('connection', (socket) => {
       game.discard.push(target.hand.splice(data.their, 1)[0]);
       const given = player.hand.splice(data.my, 1)[0];
       target.hand.splice(data.their, 0, given);
-      if (target.revealed) target.revealed.splice(data.their, 0, false);
-      player.revealed.splice(data.my, 1);
       sendHand(socket.id);
       sendHand(data.target);
+      sendDiscard();
     }
     nextTurn();
     io.to(game.order[game.turnIndex]).emit('yourTurn');

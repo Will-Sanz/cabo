@@ -2,35 +2,44 @@ const socket = io();
 const playersDiv = document.getElementById('players');
 const handDiv = document.getElementById('hand');
 const othersDiv = document.getElementById('others');
+const discardDiv = document.getElementById('discard');
 const messagesDiv = document.getElementById('messages');
 
-let hand = [];
-let revealed = [];
+let handSize = 0;
 let players = [];
 let drawn = null;
+let peeks = 0;
 
 function renderHand() {
   handDiv.innerHTML = '';
-  hand.forEach((card, i) => {
+  for (let i = 0; i < handSize; i++) {
     const div = document.createElement('div');
     div.className = 'card';
-    div.textContent = revealed[i] ? card : '?';
+    div.textContent = '?';
     if (drawn !== null) {
       div.onclick = () => {
         socket.emit('replace', i);
         clearHandlers();
       };
+    } else if (peeks > 0) {
+      div.onclick = () => socket.emit('peek', i);
     }
     handDiv.appendChild(div);
-  });
+  }
 }
 
 function renderPlayers() {
   othersDiv.innerHTML = '';
-  players.forEach(p => {
-    if (p.id === socket.id) return;
+  const others = players.filter(p => p.id !== socket.id);
+  const n = others.length;
+  others.forEach((p, idx) => {
+    const angle = (2 * Math.PI * idx) / n;
     const cont = document.createElement('div');
-    cont.textContent = p.name;
+    cont.className = 'other';
+    cont.style.left = 50 + 40 * Math.cos(angle) + '%';
+    cont.style.top = 50 + 40 * Math.sin(angle) + '%';
+    const name = document.createElement('div');
+    name.textContent = p.name;
     const h = document.createElement('div');
     h.className = 'other-hand';
     for (let i = 0; i < 4; i++) {
@@ -39,14 +48,14 @@ function renderPlayers() {
       c.textContent = '?';
       h.appendChild(c);
     }
+    cont.appendChild(name);
     cont.appendChild(h);
     othersDiv.appendChild(cont);
   });
 }
 
 function clearHandlers() {
-  const cardDivs = handDiv.querySelectorAll('.card');
-  cardDivs.forEach(div => (div.onclick = null));
+  Array.from(handDiv.children).forEach(div => (div.onclick = null));
   drawn = null;
 }
 
@@ -61,7 +70,7 @@ document.getElementById('draw').onclick = () => socket.emit('draw');
 
 document.getElementById('discard').onclick = () => {
   if (drawn !== null) {
-    socket.emit('discard', drawn);
+    socket.emit('discard');
     clearHandlers();
   }
 };
@@ -79,9 +88,12 @@ socket.on('start', () => {
 });
 
 socket.on('hand', data => {
-  hand = data.cards;
-  revealed = data.revealed;
+  handSize = data.size;
   renderHand();
+});
+
+socket.on('peeks', count => {
+  peeks = count;
 });
 
 socket.on('yourTurn', () => {
@@ -94,26 +106,20 @@ socket.on('drawn', card => {
   renderHand();
 });
 
-socket.on('power', ({ type }) => {
-  let payload = {};
-  if (type === 'peekSelf') {
-    const idx = parseInt(prompt('Look at which of your cards? (0-3)'), 10);
-    payload.index = idx;
-  } else if (type === 'peekOther') {
-    const player = prompt('Target player id');
-    const idx = parseInt(prompt('Card index 0-3'), 10);
-    payload = { target: player, index: idx };
-  } else if (type === 'blindSwap' || type === 'lookSwap') {
-    const target = prompt('Target player id');
-    const my = parseInt(prompt('Your card index 0-3'), 10);
-    const their = parseInt(prompt('Their card index 0-3'), 10);
-    payload = { target, my, their };
+socket.on('reveal', ({ index, card, player }) => {
+  if (player && player !== socket.id) {
+    alert(`Player ${player} card ${index}: ${card}`);
+    return;
   }
-  socket.emit('power', payload);
+  const div = handDiv.children[index];
+  if (div) {
+    div.textContent = card;
+    setTimeout(() => { div.textContent = '?'; }, 2000);
+  }
 });
 
-socket.on('reveal', card => {
-  alert('Revealed: ' + card);
+socket.on('discardTop', card => {
+  discardDiv.textContent = card || '';
 });
 
 socket.on('cabo', scores => {
@@ -123,4 +129,3 @@ socket.on('cabo', scores => {
   }
   messagesDiv.textContent = text;
 });
-
