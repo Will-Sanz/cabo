@@ -4,6 +4,14 @@ const messagesDiv = document.getElementById('messages');
 
 let myName = '';
 let myCards = [];
+let playerCards = {};
+
+function cardLabel(card) {
+  const valueMap = { 1: 'A', 11: 'J', 12: 'Q', 13: 'K' };
+  const suitMap = { H: '♥', D: '♦', C: '♣', S: '♠' };
+  const v = valueMap[card.value] || card.value;
+  return v + suitMap[card.suit];
+}
 
 document.getElementById('join').onclick = () => {
   const name = document.getElementById('name').value.trim();
@@ -34,6 +42,7 @@ socket.on('start', names => {
   messagesDiv.textContent = 'Game started!';
   playersDiv.innerHTML = '';
   myCards = [];
+  playerCards = {};
   names.forEach(n => {
     const pDiv = document.createElement('div');
     pDiv.className = 'player';
@@ -52,14 +61,35 @@ socket.on('start', names => {
     if (n === myName) {
       myCards = Array.from(hand.children);
     }
+    playerCards[n] = Array.from(hand.children);
   });
 });
 
 socket.on('hand', cards => {
   // store card values on your own card elements
   myCards.forEach((div, idx) => {
-    div.dataset.value = cards[idx];
+    div.dataset.value = cards[idx].value;
+    div.dataset.suit = cards[idx].suit;
+    div.textContent = cardLabel(cards[idx]);
   });
+});
+
+socket.on('hands', data => {
+  data.forEach(({ name, hand }) => {
+    const elems = playerCards[name] || [];
+    elems.forEach((div, idx) => {
+      const card = hand[idx];
+      if (card) {
+        div.textContent = cardLabel(card);
+        div.dataset.value = card.value;
+        div.dataset.suit = card.suit;
+      }
+    });
+  });
+});
+
+socket.on('reveal', ({ target, index, card }) => {
+  messagesDiv.textContent = `Reveal: ${target}'s card ${index + 1} is ${cardLabel(card)}`;
 });
 
 socket.on('yourTurn', () => {
@@ -67,7 +97,7 @@ socket.on('yourTurn', () => {
 });
 
 socket.on('drawn', card => {
-  messagesDiv.textContent = 'You drew ' + card + '. Click one of your cards to replace or Discard.';
+  messagesDiv.textContent = 'You drew ' + cardLabel(card) + '. Click one of your cards to replace or Discard.';
   myCards.forEach((div, idx) => {
     div.onclick = () => {
       socket.emit('replace', idx, card);

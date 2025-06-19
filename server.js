@@ -18,14 +18,106 @@ let game = {
   turnIndex: 0,
 };
 
+const SUITS = ['H', 'D', 'C', 'S'];
+
 function createDeck() {
   const deck = [];
-  for (let i = 0; i <= 12; i++) {
-    for (let j = 0; j < 4; j++) {
-      deck.push(i);
+  for (let value = 1; value <= 13; value++) {
+    for (const suit of SUITS) {
+      deck.push({ value, suit });
     }
   }
   return shuffle(deck);
+}
+
+function isRed(card) {
+  return card.suit === 'H' || card.suit === 'D';
+}
+
+function cardScore(card) {
+  if (card.value === 13 && isRed(card)) {
+    return -1;
+  }
+  return card.value;
+}
+
+function broadcastHands() {
+  const data = game.order.map(id => ({
+    name: game.players[id].name,
+    hand: game.players[id].hand,
+  }));
+  io.emit('hands', data);
+}
+
+function handlePower(card, socket) {
+  const player = game.players[socket.id];
+  switch (card.value) {
+    case 7:
+    case 8: {
+      const idx = Math.floor(Math.random() * player.hand.length);
+      socket.emit('reveal', {
+        target: player.name,
+        index: idx,
+        card: player.hand[idx],
+      });
+      break;
+    }
+    case 9:
+    case 10: {
+      const otherId = game.order.find(id => id !== socket.id);
+      if (otherId) {
+        const otherPlayer = game.players[otherId];
+        const idx = Math.floor(Math.random() * otherPlayer.hand.length);
+        socket.emit('reveal', {
+          target: otherPlayer.name,
+          index: idx,
+          card: otherPlayer.hand[idx],
+        });
+      }
+      break;
+    }
+    case 11:
+    case 12: {
+      const otherId = game.order.find(id => id !== socket.id);
+      if (otherId) {
+        const otherPlayer = game.players[otherId];
+        const idxSelf = Math.floor(Math.random() * player.hand.length);
+        const idxOther = Math.floor(Math.random() * otherPlayer.hand.length);
+        [player.hand[idxSelf], otherPlayer.hand[idxOther]] = [
+          otherPlayer.hand[idxOther],
+          player.hand[idxSelf],
+        ];
+        broadcastHands();
+      }
+      break;
+    }
+    case 13: {
+      if (card.suit === 'S' || card.suit === 'C') {
+        const otherId = game.order.find(id => id !== socket.id);
+        if (otherId) {
+          const otherPlayer = game.players[otherId];
+          const idxSelf = Math.floor(Math.random() * player.hand.length);
+          const idxOther = Math.floor(Math.random() * otherPlayer.hand.length);
+          socket.emit('reveal', {
+            target: player.name,
+            index: idxSelf,
+            card: player.hand[idxSelf],
+          });
+          socket.emit('reveal', {
+            target: otherPlayer.name,
+            index: idxOther,
+            card: otherPlayer.hand[idxOther],
+          });
+          [player.hand[idxSelf], otherPlayer.hand[idxOther]] = [
+            otherPlayer.hand[idxOther],
+            player.hand[idxSelf],
+          ];
+          broadcastHands();
+        }
+      }
+      break;
+    }
+  }
 }
 
 function shuffle(array) {
@@ -58,6 +150,7 @@ function deal() {
   });
   game.started = true;
   game.turnIndex = 0;
+  broadcastHands();
 }
 
 io.on('connection', (socket) => {
@@ -91,6 +184,8 @@ io.on('connection', (socket) => {
     player.hand[index] = card;
     game.discard.push(old);
     socket.emit('hand', player.hand);
+    handlePower(old, socket);
+    broadcastHands();
     nextTurn();
     io.to(game.order[game.turnIndex]).emit('yourTurn');
   });
@@ -100,6 +195,8 @@ io.on('connection', (socket) => {
     if (!game.started || currentPlayer() !== player) return;
     game.discard.push(card);
     socket.emit('hand', player.hand);
+    handlePower(card, socket);
+    broadcastHands();
     nextTurn();
     io.to(game.order[game.turnIndex]).emit('yourTurn');
   });
@@ -108,7 +205,10 @@ io.on('connection', (socket) => {
     if (!game.started) return;
     const scores = {};
     game.order.forEach(id => {
-      scores[game.players[id].name] = game.players[id].hand.reduce((a,b) => a+b, 0);
+      scores[game.players[id].name] = game.players[id].hand.reduce(
+        (a, b) => a + cardScore(b),
+        0
+      );
     });
     io.emit('cabo', scores);
     game.started = false;
