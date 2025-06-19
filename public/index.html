@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Cabo Online</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div id="table">
+    <div id="players"></div>
+    <div id="controls">
+      <input id="name" placeholder="Your name" />
+      <button id="join">Join</button>
+      <button id="start">Start</button>
+      <button id="draw">Draw</button>
+      <button id="call">Call Cabo</button>
+    </div>
+    <div id="hand"></div>
+    <div id="messages"></div>
+  </div>
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="client.js"></script>
+</body>
+</html>

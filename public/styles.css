@@ -1,0 +1,33 @@
+body {
+  background-color: #35654d;
+  font-family: sans-serif;
+  color: white;
+  text-align: center;
+}
+
+#table {
+  margin: auto;
+  padding: 20px;
+}
+
+#players {
+  margin-bottom: 10px;
+}
+
+#hand {
+  margin-top: 20px;
+}
+
+.card {
+  display: inline-block;
+  width: 50px;
+  height: 70px;
+  line-height: 70px;
+  border: 1px solid #fff;
+  margin: 5px;
+  background: #1e2824;
+}
+
+#messages {
+  margin-top: 20px;
+}
