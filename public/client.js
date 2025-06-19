@@ -1,11 +1,16 @@
 const socket = io();
 const playersDiv = document.getElementById('players');
-const handDiv = document.getElementById('hand');
 const messagesDiv = document.getElementById('messages');
+
+let myName = '';
+let myCards = [];
 
 document.getElementById('join').onclick = () => {
   const name = document.getElementById('name').value.trim();
-  if (name) socket.emit('join', name);
+  if (name) {
+    myName = name;
+    socket.emit('join', name);
+  }
 };
 
 document.getElementById('start').onclick = () => {
@@ -21,20 +26,39 @@ document.getElementById('call').onclick = () => {
 };
 
 socket.on('players', names => {
+  // Show joined players before the game starts
   playersDiv.textContent = 'Players: ' + names.join(', ');
 });
 
 socket.on('start', names => {
   messagesDiv.textContent = 'Game started!';
+  playersDiv.innerHTML = '';
+  myCards = [];
+  names.forEach(n => {
+    const pDiv = document.createElement('div');
+    pDiv.className = 'player';
+    const nameDiv = document.createElement('div');
+    nameDiv.textContent = n;
+    const hand = document.createElement('div');
+    hand.className = 'player-hand';
+    for (let i = 0; i < 4; i++) {
+      const c = document.createElement('div');
+      c.className = 'card';
+      hand.appendChild(c);
+    }
+    pDiv.appendChild(nameDiv);
+    pDiv.appendChild(hand);
+    playersDiv.appendChild(pDiv);
+    if (n === myName) {
+      myCards = Array.from(hand.children);
+    }
+  });
 });
 
 socket.on('hand', cards => {
-  handDiv.innerHTML = '';
-  cards.forEach(card => {
-    const div = document.createElement('div');
-    div.className = 'card';
-    div.textContent = card;
-    handDiv.appendChild(div);
+  // store card values on your own card elements
+  myCards.forEach((div, idx) => {
+    div.dataset.value = cards[idx];
   });
 });
 
@@ -44,8 +68,7 @@ socket.on('yourTurn', () => {
 
 socket.on('drawn', card => {
   messagesDiv.textContent = 'You drew ' + card + '. Click one of your cards to replace or Discard.';
-  const cardDivs = handDiv.querySelectorAll('.card');
-  cardDivs.forEach((div, idx) => {
+  myCards.forEach((div, idx) => {
     div.onclick = () => {
       socket.emit('replace', idx, card);
       clearHandlers();
@@ -62,6 +85,5 @@ socket.on('cabo', scores => {
 });
 
 function clearHandlers() {
-  const cardDivs = handDiv.querySelectorAll('.card');
-  cardDivs.forEach(div => (div.onclick = null));
+  myCards.forEach(div => (div.onclick = null));
 }
