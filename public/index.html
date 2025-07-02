@@ -2,22 +2,110 @@
 <html>
 <head>
   <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Cabo Online</title>
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
-  <div id="table">
-    <div id="discard"></div>
-    <div id="players"></div>
+  <div id="app">
+    <!-- Top Bar -->
+    <div class="top-bar">
+      <div class="game-title">🎮 Cabo</div>
+      <div class="player-info">
+        <span id="playerCount">Players: 0</span>
+        <span id="gameStatus">Waiting for players...</span>
+      </div>
+    </div>
+
+    <!-- Main Game Area -->
+    <div class="game-container">
+      <div id="table">
+        <div id="center">
+          <div id="deck"></div>
+          <div id="discard"></div>
+        </div>
+        <div id="players"></div>
+      </div>
+    </div>
+
+    <!-- Messages Area -->
+    <div id="messages">Welcome to Cabo! Click Rules to learn how to play.</div>
+
+    <!-- Control Panel -->
+    <div class="control-panel">
+      <div class="controls-row">
+        <div class="controls-left">
+          <input id="name" type="text" placeholder="Enter your name" />
+          <button id="join" class="btn-primary">Join Game</button>
+          <button id="start" class="btn-success">Start Game</button>
+        </div>
+        <div class="controls-right">
+          <button id="draw" class="btn-primary">Draw Card</button>
+          <button id="call" class="btn-danger">Call Cabo</button>
+          <button id="rules" class="btn-secondary">Rules</button>
+        </div>
+      </div>
+    </div>
   </div>
-  <div id="controls">
-    <input id="name" placeholder="Your name" />
-    <button id="join">Join</button>
-    <button id="start">Start</button>
-    <button id="draw">Draw</button>
-    <button id="call">Call Cabo</button>
+  
+  <!-- Rules Modal -->
+  <div id="rulesModal" class="modal">
+    <div class="modal-content">
+      <span class="close">&times;</span>
+      <h2>Cabo Card Game Rules</h2>
+      <div class="rules-content">
+        <h3>Setup</h3>
+        <ul>
+          <li>2-8 players</li>
+          <li>54-card deck (standard 52 + 2 jokers)</li>
+          <li>Each player gets 4 cards in a 2x2 grid, face-down</li>
+          <li>Players can initially look at their bottom 2 cards only</li>
+        </ul>
+        
+        <h3>Card Values (Scoring)</h3>
+        <ul>
+          <li>Ace = 1 point</li>
+          <li>Cards 2-10 = Face value</li>
+          <li>Jack = 11 points</li>
+          <li>Queen = 12 points</li>
+          <li>Red Kings (♥♦) = -1 point</li>
+          <li>Black Kings (♣♠) = 13 points</li>
+          <li>Jokers = 0 points</li>
+        </ul>
+        
+        <h3>Turn Actions</h3>
+        <ol>
+          <li><strong>Draw:</strong> Choose to draw from deck or discard pile</li>
+          <li><strong>After drawing:</strong>
+            <ul>
+              <li>Replace one of your cards with drawn card</li>
+              <li>Discard the drawn card</li>
+            </ul>
+          </li>
+          <li><strong>Matching:</strong> Click your cards that match the top discard card value to discard them (wrong click = penalty card)</li>
+        </ol>
+        
+        <h3>Power Cards (Only when drawn from face-down deck)</h3>
+        <ul>
+          <li><strong>7 or 8:</strong> Peek at one of your own cards</li>
+          <li><strong>9 or 10:</strong> Peek at one opponent's card</li>
+          <li><strong>Jack or Queen:</strong> Blind swap one of your cards with opponent's card</li>
+          <li><strong>Black King:</strong> Peek at opponent's card and your own, then optionally swap them</li>
+        </ul>
+        
+        <h3>Ending the Game</h3>
+        <ul>
+          <li><strong>Call Cabo:</strong> Any player can call "Cabo" - everyone gets one more turn</li>
+          <li><strong>Run out of cards:</strong> If a player has no cards - everyone gets one more turn</li>
+          <li><strong>Empty deck:</strong> Discard pile is shuffled back into deck</li>
+        </ul>
+        
+        <h3>Winning</h3>
+        <p>Player with the lowest total score wins!</p>
+      </div>
+    </div>
   </div>
-  <div id="messages"></div>
+  
   <script src="/socket.io/socket.io.js"></script>
   <script src="client.js"></script>
 </body>
